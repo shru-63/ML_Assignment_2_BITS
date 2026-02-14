@@ -30,26 +30,42 @@ if uploaded_file is not None:
 
     if st.sidebar.button("Run Evaluation"):
         try:
-            # 3. Preprocessing Logic (Must match your notebook)
+            # 3. Preprocessing Logic
             df_clean = df.copy()
-            # Convert TotalCharges to numeric and handle missing values
             df_clean['TotalCharges'] = pd.to_numeric(df_clean['TotalCharges'], errors='coerce').fillna(0)
-            
-            # Drop customerID as it's not a feature
+           
             if 'customerID' in df_clean.columns:
                 df_clean.drop('customerID', axis=1, inplace=True)
-            
-            # Separate target and features
+           
             if 'Churn' in df_clean.columns:
                 y_true = df_clean['Churn'].apply(lambda x: 1 if x == 'Yes' else 0)
                 df_clean.drop('Churn', axis=1, inplace=True)
             else:
-                st.error("Target column 'Churn' not found in CSV.")
+                st.error("Target column 'Churn' not found.")
                 st.stop()
 
-            # One-hot encoding (get_dummies)
+            # Perform encoding
             X = pd.get_dummies(df_clean)
 
+            # --- CRITICAL FIX: The 30 features your model expects ---
+            expected_features = [
+                'SeniorCitizen', 'tenure', 'MonthlyCharges', 'TotalCharges',
+                'gender_Female', 'gender_Male', 'Partner_No', 'Partner_Yes',
+                'Dependents_No', 'Dependents_Yes', 'PhoneService_No', 'PhoneService_Yes',
+                'MultipleLines_No', 'MultipleLines_No phone service', 'MultipleLines_Yes',
+                'InternetService_DSL', 'InternetService_Fiber optic', 'InternetService_No',
+                'OnlineSecurity_No', 'OnlineSecurity_No internet service', 'OnlineSecurity_Yes',
+                'OnlineBackup_No', 'OnlineBackup_No internet service', 'OnlineBackup_Yes',
+                'DeviceProtection_No', 'DeviceProtection_No internet service', 'DeviceProtection_Yes',
+                'TechSupport_No', 'TechSupport_No internet service', 'TechSupport_Yes'
+            ]
+           
+            # Reindex X to match the expected 30 features exactly
+            X = X.reindex(columns=expected_features, fill_value=0)
+
+            # 4. Load the selected model
+            model_path = f"model/{model_option}.pkl"
+            model = joblib.load(model_path)
             # 4. Load the selected model
             model_path = f"model/{model_option}.pkl"
             model = joblib.load(model_path)
@@ -99,3 +115,4 @@ if uploaded_file is not None:
 else:
 
     st.info("Please upload the Telco Churn CSV file from the sidebar to begin.")
+
