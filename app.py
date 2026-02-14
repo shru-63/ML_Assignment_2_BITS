@@ -53,15 +53,22 @@ if uploaded_file is not None:
             # 4. Load the selected model
             model_path = f"model/{model_option}.pkl"
             model = joblib.load(model_path)
-            
-            # Align features with the trained model (handling potential missing columns from dummies)
-            model_features = model.feature_names_in_
-            X = X.reindex(columns=model_features, fill_value=0)
+           
+            # --- FIX STARTS HERE ---
+            # Try to get features from the model, otherwise fall back to the columns in X
+            if hasattr(model, "feature_names_in_"):
+                model_features = model.feature_names_in_
+                X = X.reindex(columns=model_features, fill_value=0)
+            else:
+                # If the model doesn't have feature_names_in_, we assume the
+                # preprocessing in this app matches the training.
+                st.warning("Model does not contain feature names; using current data columns.")
+            # --- FIX ENDS HERE ---
 
             # Predictions
             y_pred = model.predict(X)
-            y_probs = model.predict_proba(X)[:, 1] if hasattr(model, "predict_proba") else y_pred
 
+            
             # 5. Display metrics
             st.subheader(f"📈 Performance Metrics: {model_option.replace('_', ' ').title()}")
             
@@ -90,4 +97,5 @@ if uploaded_file is not None:
         except Exception as e:
             st.error(f"An error occurred: {e}")
 else:
+
     st.info("Please upload the Telco Churn CSV file from the sidebar to begin.")
