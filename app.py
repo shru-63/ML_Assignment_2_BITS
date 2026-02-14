@@ -10,18 +10,16 @@ st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
 st.title("📊 Customer Churn Prediction Dashboard")
 st.markdown("This app evaluates 6 different ML models to predict if a customer will leave the company.")
 
-# 1. Dataset upload option (CSV)
+# 1. Dataset upload
 st.sidebar.header("Upload Data")
 uploaded_file = st.sidebar.file_uploader("Upload 'WA_Fn-UseC_-Telco-Customer-Churn.csv'", type=["csv"])
 
 if uploaded_file is not None:
-    # Load data
     df = pd.read_csv(uploaded_file)
-    
     st.subheader("📋 Dataset Preview")
     st.dataframe(df.head())
 
-    # 2. Model selection dropdown
+    # 2. Model selection
     st.sidebar.header("Model Selection")
     model_option = st.sidebar.selectbox(
         "Choose a Machine Learning Model",
@@ -41,13 +39,13 @@ if uploaded_file is not None:
                 y_true = df_clean['Churn'].apply(lambda x: 1 if x == 'Yes' else 0)
                 df_clean.drop('Churn', axis=1, inplace=True)
             else:
-                st.error("Target column 'Churn' not found.")
+                st.error("Target column 'Churn' not found in CSV.")
                 st.stop()
 
-            # Perform encoding
+            # Perform one-hot encoding
             X = pd.get_dummies(df_clean)
 
-            # --- CRITICAL FIX: The 30 features your model expects ---
+            # --- CRITICAL FIX: Match the exact 30 features your model expects ---
             expected_features = [
                 'SeniorCitizen', 'tenure', 'MonthlyCharges', 'TotalCharges',
                 'gender_Female', 'gender_Male', 'Partner_No', 'Partner_Yes',
@@ -60,34 +58,26 @@ if uploaded_file is not None:
                 'TechSupport_No', 'TechSupport_No internet service', 'TechSupport_Yes'
             ]
            
-            # Reindex X to match the expected 30 features exactly
+            # This reindex forces the app to use only the 30 features the model knows
             X = X.reindex(columns=expected_features, fill_value=0)
 
             # 4. Load the selected model
             model_path = f"model/{model_option}.pkl"
             model = joblib.load(model_path)
-            # 4. Load the selected model
-            model_path = f"model/{model_option}.pkl"
-            model = joblib.load(model_path)
            
-            # --- FIX STARTS HERE ---
-            # Try to get features from the model, otherwise fall back to the columns in X
-            if hasattr(model, "feature_names_in_"):
-                model_features = model.feature_names_in_
-                X = X.reindex(columns=model_features, fill_value=0)
-            else:
-                # If the model doesn't have feature_names_in_, we assume the
-                # preprocessing in this app matches the training.
-                st.warning("Model does not contain feature names; using current data columns.")
-            # --- FIX ENDS HERE ---
-
             # Predictions
             y_pred = model.predict(X)
+           
+            # Fix for y_probs: Ensure it is defined for AUC calculation
 
-            
+            if hasattr(model, "predict_proba"):
+                y_probs = model.predict_proba(X)[:, 1]
+            else:
+                y_probs = y_pred
+
             # 5. Display metrics
             st.subheader(f"📈 Performance Metrics: {model_option.replace('_', ' ').title()}")
-            
+           
             col1, col2, col3 = st.columns(3)
             col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred):.4f}")
             col2.metric("AUC Score", f"{roc_auc_score(y_true, y_probs):.4f}")
@@ -113,6 +103,5 @@ if uploaded_file is not None:
         except Exception as e:
             st.error(f"An error occurred: {e}")
 else:
-
     st.info("Please upload the Telco Churn CSV file from the sidebar to begin.")
 
